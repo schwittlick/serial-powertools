@@ -108,7 +108,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                         if job_id in jobs:
                             jobs[job_id]["notified"] = True
 
-    except asyncio.IncompleteReadError, ConnectionResetError:
+    except (asyncio.IncompleteReadError, ConnectionResetError):
         pass
     finally:
         writer.close()

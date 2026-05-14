@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-progress runs on the same branch when a new commit is pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit tests (meson)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            meson \
+            ninja-build \
+            pkg-config \
+            libserialport-dev \
+            libglfw3-dev \
+            libgl-dev \
+            git
+
+      - name: Configure
+        run: meson setup build
+
+      - name: Compile
+        run: meson compile -C build
+
+      - name: Run unit tests
+        run: meson test -C build --print-errorlogs
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-logs
+          path: build/meson-logs/
+
+  integration:
+    name: Integration (Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run integration suite
+        # Slice 2 (plotter ↔ fake plotter via socat PTY) is currently skipped
+        # because libserialport 0.1.x rejects /dev/pts/* paths. Re-enable by
+        # dropping the env var once SerialIo migrates off libserialport.
+        env:
+          INTEGRATION_SKIP_PLOTTER: "1"
+        run: ./tests/integration/run.sh

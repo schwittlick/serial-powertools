@@ -1,0 +1,12 @@
+build/
+build-integration/
+subprojects/imgui/
+subprojects/imgui-*/
+subprojects/packagecache/
+imgui.ini
+*.o
+*.a
+.cache/
+compile_commands.json
+__pycache__/
+*.pyc

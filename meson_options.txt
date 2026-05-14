@@ -1,0 +1,2 @@
+option('build_tests', type : 'boolean', value : true,
+  description : 'Build unit-test executables under tests/')

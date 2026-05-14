@@ -1,0 +1,40 @@
+# Two services on a shared bridge network:
+#   - progress-server: runs the real Python progress_server.py
+#   - tester:          builds the project + runs both integration slices
+#
+# The tester is what drives the run; the server stays up in the background.
+# Use `run.sh` to orchestrate (build image, up --abort-on-container-exit).
+
+services:
+  progress-server:
+    image: serial-powertools-tests
+    build: .
+    command: python3 /workspace/tools/progress/progress_server.py
+    environment:
+      PROGRESS_BIND_HOST: "0.0.0.0"
+      PROGRESS_PORT: "9876"
+    volumes:
+      - ../..:/workspace
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('localhost', 9876), timeout=1).close()"]
+      interval: 1s
+      timeout: 2s
+      retries: 10
+
+  tester:
+    image: serial-powertools-tests
+    depends_on:
+      progress-server:
+        condition: service_healthy
+    command: bash /workspace/tests/integration/run_inside.sh
+    environment:
+      PROGRESS_HOST: progress-server
+      PROGRESS_PORT: "9876"
+      # Pass through from the host so CI can skip slice 2 until the
+      # libserialport→POSIX refactor.
+      INTEGRATION_SKIP_PLOTTER: "${INTEGRATION_SKIP_PLOTTER:-0}"
+    volumes:
+      - ../..:/workspace
+    # socat / pty creation needs no extra caps in default Docker; PTYs are
+    # allocated from the container's own /dev/pts (devpts is mounted by
+    # default).
