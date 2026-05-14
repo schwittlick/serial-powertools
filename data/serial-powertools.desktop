@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Serial Powertools
+Comment=Stream HPGL files to vintage HP pen plotters over serial
+Exec=serial-powertools
+Icon=serial-powertools
+Type=Application
+Categories=Utility;Graphics;
+Terminal=false
