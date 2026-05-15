@@ -20,6 +20,8 @@ namespace serialpowertools {
 class AsyncSerialSender {
 public:
     using ProgressCb = std::function<void(std::size_t index, std::size_t total)>;
+    using QueryCb    = std::function<void(const std::string& command,
+                                          const std::string& response)>;
 
     explicit AsyncSerialSender(hpgl::HpglPlotter* plotter);
     ~AsyncSerialSender();
@@ -58,14 +60,25 @@ public:
     // Insert at the current send position (mid-stream).
     void insertCommands(const std::vector<std::string>& commands);
 
+    // Enqueue an HPGL query (e.g. "OI;"). The worker writes it and reads the
+    // plotter's reply, then invokes `cb` from the worker thread. Serialised
+    // with normal sending, so it is safe to call during a file send — the
+    // reply is read on the same thread that owns the port, avoiding a race.
+    void query(std::string command, QueryCb cb);
+
     // Live counters for the UI.
     std::size_t currentIndex() const { return currentIndex_.load(std::memory_order_acquire); }
     std::size_t total()        const { return total_.load(std::memory_order_acquire); }
 
 private:
     void run();
+    // Write any pending queries and dispatch their replies. Worker-thread only.
+    void drainQueries();
 
     hpgl::HpglPlotter* plotter_;
+
+    struct PendingQuery { std::string command; QueryCb cb; };
+    std::vector<PendingQuery> queries_;        // guarded by mu_
 
     std::mutex mu_;
     std::condition_variable cv_;

@@ -8,6 +8,7 @@
 
 #include <libserialport.h>
 
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -18,6 +19,26 @@ namespace serialpowertools {
 namespace {
 
 constexpr std::size_t kMaxLogLines = 10'000;
+
+// HPGL "output" instructions (OA, OE, OH, OI, OS, ...) make the plotter reply,
+// as do the ESC.A/.B/.E/.O device queries. Detect a command that starts with
+// such a query so the reply can be read back instead of fire-and-forgotten.
+bool isQueryCommand(const std::string& cmd) {
+    std::size_t i = 0;
+    while (i < cmd.size() && std::isspace(static_cast<unsigned char>(cmd[i]))) ++i;
+    if (i + 1 >= cmd.size()) return false;
+    if (cmd[i] == 'O' && std::isupper(static_cast<unsigned char>(cmd[i + 1])))
+        return true;
+    if (cmd[i] == '\x1B' && cmd[i + 1] == '.' && i + 2 < cmd.size())
+        return std::string("ABEO").find(cmd[i + 2]) != std::string::npos;
+    return false;
+}
+
+std::string trimmed(std::string s) {
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back())))
+        s.pop_back();
+    return s;
+}
 
 }
 
@@ -120,6 +141,16 @@ void AppState::disconnect() {
 void AppState::sendCommand(const std::string& cmd) {
     if (!connected() || !sender_) {
         pushLog("Not connected.");
+        return;
+    }
+    // Query commands: write and read the plotter's reply back, then log it.
+    if (isQueryCommand(cmd)) {
+        pushLog("Sent: " + cmd);
+        sender_->query(cmd, [this](const std::string& c, const std::string& r) {
+            std::string resp = trimmed(r);
+            pushLog(trimmed(c) + " -> " + (resp.empty() ? "(no response)" : resp));
+            wake();
+        });
         return;
     }
     auto tokens = hpgl::tokenize(cmd);

@@ -85,10 +85,36 @@ void AsyncSerialSender::insertCommands(const std::vector<std::string>& commands)
     total_.store(commands_.size(), std::memory_order_release);
 }
 
+void AsyncSerialSender::query(std::string command, QueryCb cb) {
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        queries_.push_back({std::move(command), std::move(cb)});
+    }
+    cv_.notify_all();
+}
+
+void AsyncSerialSender::drainQueries() {
+    std::vector<PendingQuery> pending;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        if (queries_.empty()) return;
+        pending.swap(queries_);
+    }
+    // Write the query and read the plotter's reply on this (the port-owning)
+    // thread, so it never races with batch sends or the freeMemory() poll.
+    for (auto& q : pending) {
+        plotter_->write(q.command);
+        std::string response = plotter_->readUntil();
+        if (q.cb) q.cb(q.command, response);
+    }
+}
+
 void AsyncSerialSender::run() {
     while (!stopped_.load(std::memory_order_acquire)) {
+        drainQueries();
         // Inner loop: send batches until the queue is exhausted.
         while (!stopped_.load(std::memory_order_acquire)) {
+            drainQueries();
             std::size_t idx = currentIndex_.load(std::memory_order_acquire);
             std::size_t total;
             {
@@ -157,6 +183,7 @@ void AsyncSerialSender::run() {
         std::unique_lock<std::mutex> lk(mu_);
         cv_.wait_for(lk, 1s, [&] {
             return stopped_.load(std::memory_order_acquire) ||
+                   !queries_.empty() ||
                    currentIndex_.load(std::memory_order_acquire) < commands_.size();
         });
     }

@@ -275,10 +275,20 @@ void drawOutput(AppState& app) {
     ImGui::Checkbox("Auto-scroll", &s.autoScroll);
     ImGui::SameLine();
     if (ImGui::Button("Clear output")) app.clearLog();
+    ImGui::SameLine();
+    bool copyAll = ImGui::Button("Copy");
 
     auto log = app.snapshotLog();
+    if (copyAll) {
+        std::string joined;
+        for (const auto& line : log) { joined += line; joined += '\n'; }
+        ImGui::SetClipboardText(joined.c_str());
+    }
+
     ImGui::BeginChild("##scroll", ImVec2(0, 0), true,
                       ImGuiWindowFlags_HorizontalScrollbar);
+    // Plain text lines keep auto-scroll working; the "Copy" button above grabs
+    // the whole buffer (ImGui TextUnformatted has no mouse text selection).
     for (const auto& line : log) ImGui::TextUnformatted(line.c_str());
     if (s.autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1.0f) {
         ImGui::SetScrollHereY(1.0f);
