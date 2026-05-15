@@ -40,8 +40,6 @@ The server is authoritative — see `progress_server.py` for the exact state sha
 
 ## 1. Deploy the server
 
-### Quick install (recommended)
-
 `install-progress-server.sh` copies `progress_server.py` to a stable path, writes
 the systemd unit, and enables + starts the service:
 
@@ -52,41 +50,19 @@ sudo ./install-progress-server.sh --system          # system-wide service
 ./install-progress-server.sh --uninstall            # remove it
 ```
 
-Run `./install-progress-server.sh --help` for all options. The rest of this
-section explains the manual setup the script automates.
+Run `./install-progress-server.sh --help` for all options.
 
-### Manual setup
+Multi-machine: open TCP port `9876` (or your chosen `PROGRESS_PORT`) in the
+server host's firewall.
 
-Copy or symlink `progress_server.py` to a stable path on the host that should hold job state. The simplest single-machine setup is to run server + reporter + waybar all on the desktop with defaults.
-
-Multi-machine: pick the host (e.g. your job runner). Open TCP port `9876` (or whatever `PROGRESS_PORT` you choose) in its firewall.
-
-systemd user service at `~/.config/systemd/user/progress-server.service`:
-```ini
-[Unit]
-Description=Job Progress Server
-After=network.target
-
-[Service]
-# Optional: override defaults
-# Environment=PROGRESS_PORT=9876
-# Environment=PROGRESS_BIND_HOST=0.0.0.0
-ExecStart=/usr/bin/python3 %h/bin/progress_server.py
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=default.target
-```
-
-Enable + start:
+Control the running service (drop `--user` if installed with `--system`):
 ```sh
-systemctl --user daemon-reload
-systemctl --user enable --now progress-server
-journalctl --user -u progress-server -f      # tail logs
+systemctl --user status progress-server         # check state
+systemctl --user restart progress-server        # restart
+systemctl --user stop progress-server           # stop until next login/reboot
+systemctl --user disable --now progress-server  # stop and stop it coming back
+journalctl --user -u progress-server -f         # tail logs
 ```
-
-System-wide (root): drop into `/etc/systemd/system/` instead and use `systemctl enable --now progress-server`.
 
 ## 2. Deploy the waybar consumer
 
