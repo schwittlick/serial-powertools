@@ -48,6 +48,11 @@ DiscoveredPort PortDiscovery::probePort(const std::string& device, int baudrate,
     sp_set_parity(g.p, SP_PARITY_NONE);
     sp_set_stopbits(g.p, 1);
     sp_set_flowcontrol(g.p, SP_FLOWCONTROL_NONE);
+    // pyserial asserts DTR/RTS high on open by default; libserialport does not.
+    // Many plotters gate their transmitter on DTR, so they receive OI; but never
+    // send the model reply unless these lines are raised.
+    sp_set_dtr(g.p, SP_DTR_ON);
+    sp_set_rts(g.p, SP_RTS_ON);
 
     // OI; probe — works for HP7470A / Roland DXY which don't respond to ESC.A.
     hpgl::writeAll(g.p, hpgl::MODEL_IDENTIFICATION);

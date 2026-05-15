@@ -2,8 +2,6 @@
 
 #include <libserialport.h>
 
-#include <algorithm>
-
 namespace hpgl {
 
 std::string readUntilChar(sp_port* port, char terminator,
@@ -16,15 +14,17 @@ std::string readUntilChar(sp_port* port, char terminator,
         return data;
     }
 
+    // Mirror reference read_until_char (reference/hpgl/__init__.py): the loop
+    // budget is `timeout`, but each single-byte read blocks up to the full
+    // `timeout` — pyserial's per-read port timeout. The loop condition is
+    // checked *before* each read, so the last read may overshoot the budget,
+    // giving an effective worst case of ~2x `timeout`, exactly as in Python.
+    const unsigned readMs =
+        timeout.count() > 0 ? static_cast<unsigned>(timeout.count()) : 0u;
     const auto start = std::chrono::steady_clock::now();
     while (std::chrono::steady_clock::now() - start < timeout) {
         char byte = 0;
-        auto remaining = timeout - (std::chrono::steady_clock::now() - start);
-        auto slice = std::min<std::chrono::milliseconds>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(remaining),
-            std::chrono::milliseconds(50));
-        unsigned ms = slice.count() < 0 ? 0u : static_cast<unsigned>(slice.count());
-        int n = sp_blocking_read(port, &byte, 1, ms);
+        int n = sp_blocking_read(port, &byte, 1, readMs);
         if (n < 0) {
             if (okOut) *okOut = false;
             return data;

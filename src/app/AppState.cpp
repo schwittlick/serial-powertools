@@ -72,6 +72,9 @@ bool AppState::connect(const std::string& device, int baud) {
     sp_set_parity(port_, SP_PARITY_NONE);
     sp_set_stopbits(port_, 1);
     sp_set_flowcontrol(port_, SP_FLOWCONTROL_NONE);
+    // Match pyserial: assert DTR/RTS — plotters gate their transmitter on DTR.
+    sp_set_dtr(port_, SP_DTR_ON);
+    sp_set_rts(port_, SP_RTS_ON);
 
     plotter_ = std::make_unique<hpgl::HpglPlotter>(port_);
     detectedModel_ = plotter_->applyModelInit();
