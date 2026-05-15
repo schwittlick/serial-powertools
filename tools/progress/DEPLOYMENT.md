@@ -40,6 +40,23 @@ The server is authoritative — see `progress_server.py` for the exact state sha
 
 ## 1. Deploy the server
 
+### Quick install (recommended)
+
+`install-progress-server.sh` copies `progress_server.py` to a stable path, writes
+the systemd unit, and enables + starts the service:
+
+```sh
+./install-progress-server.sh                       # per-user service, defaults
+./install-progress-server.sh --port 9999            # override the port
+sudo ./install-progress-server.sh --system          # system-wide service
+./install-progress-server.sh --uninstall            # remove it
+```
+
+Run `./install-progress-server.sh --help` for all options. The rest of this
+section explains the manual setup the script automates.
+
+### Manual setup
+
 Copy or symlink `progress_server.py` to a stable path on the host that should hold job state. The simplest single-machine setup is to run server + reporter + waybar all on the desktop with defaults.
 
 Multi-machine: pick the host (e.g. your job runner). Open TCP port `9876` (or whatever `PROGRESS_PORT` you choose) in its firewall.
